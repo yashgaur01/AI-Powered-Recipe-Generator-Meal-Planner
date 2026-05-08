@@ -723,6 +723,22 @@ export default function App() {
     () => (recipe ? getDisplayNutrition(recipe) : null),
     [recipe]
   );
+  function getMealSlotDisplayName(slotValue) {
+    const raw = String(slotValue || "").trim();
+    if (!raw) return "Not set";
+    const matchedRecipe = recipes.find((item) => item.id === raw);
+    if (matchedRecipe?.title) return matchedRecipe.title;
+
+    // Avoid showing opaque DB IDs like "cmov..." in the UI.
+    const looksLikeGeneratedId = /^gen-\d+$/i.test(raw);
+    const looksLikeCuid = /^c[a-z0-9]{20,}$/i.test(raw);
+    if (looksLikeGeneratedId || looksLikeCuid) {
+      return "Saved recipe (title unavailable)";
+    }
+
+    // Backward-compatible fallback for older records that may store raw titles.
+    return raw;
+  }
   const macroTargetsFilled = ["calorieTarget", "proteinTarget", "carbsTarget", "fatTarget"].filter(
     (key) => String(preferences[key] || "").trim() !== ""
   ).length;
@@ -1894,9 +1910,9 @@ export default function App() {
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                       {plannerDays.map((day) => {
                         const dayPlan = savedWeeklyPlan.slots?.[day] || {};
-                        const breakfastTitle = recipes.find((item) => item.id === dayPlan.breakfast)?.title || dayPlan.breakfast || "Not set";
-                        const lunchTitle = recipes.find((item) => item.id === dayPlan.lunch)?.title || dayPlan.lunch || "Not set";
-                        const dinnerTitle = recipes.find((item) => item.id === dayPlan.dinner)?.title || dayPlan.dinner || "Not set";
+                        const breakfastTitle = getMealSlotDisplayName(dayPlan.breakfast);
+                        const lunchTitle = getMealSlotDisplayName(dayPlan.lunch);
+                        const dinnerTitle = getMealSlotDisplayName(dayPlan.dinner);
                         return (
                           <div key={day} className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
                             <p className="mb-2 text-sm font-semibold text-blue-900">{day}</p>
