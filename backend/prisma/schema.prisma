@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DietType {
+  OMNIVORE
+  VEGETARIAN
+  VEGAN
+  KETO
+  PALEO
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String?
+  name          String?
+  role          UserRole       @default(USER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  preference    UserPreference?
+  oauthAccounts OAuthAccount[]
+  recipes       Recipe[]
+  mealPlans     MealPlan[]
+  shoppingLists ShoppingList[]
+  mealHistory   MealHistory[]
+  notifications Notification[]
+}
+
+model OAuthAccount {
+  id                 String   @id @default(cuid())
+  userId             String
+  provider           String
+  providerAccountId  String
+  createdAt          DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model UserPreference {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  dietType          DietType @default(OMNIVORE)
+  allergies         String[]
+  dislikedItems     String[]
+  calorieTarget     Int?
+  proteinTarget     Int?
+  carbsTarget       Int?
+  fatTarget         Int?
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Recipe {
+  id           String   @id @default(cuid())
+  userId       String
+  title        String
+  cuisine      String?
+  ingredients  String[]
+  steps        String[]
+  calories     Int?
+  protein      Int?
+  carbs        Int?
+  fat          Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealHistory  MealHistory[]
+}
+
+model MealPlan {
+  id         String   @id @default(cuid())
+  userId     String
+  weekStart  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      MealPlanItem[]
+
+  @@index([userId, weekStart])
+  @@unique([userId, weekStart])
+}
+
+model MealPlanItem {
+  id          String   @id @default(cuid())
+  mealPlanId  String
+  dayOfWeek   Int
+  mealType    String
+  recipeTitle String
+  ingredients String[]
+  mealPlan    MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+}
+
+model ShoppingList {
+  id         String             @id @default(cuid())
+  userId     String
+  title      String
+  createdAt  DateTime           @default(now())
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      ShoppingListItem[]
+}
+
+model ShoppingListItem {
+  id             String       @id @default(cuid())
+  shoppingListId String
+  name           String
+  quantity       Float?
+  unit           String?
+  purchased      Boolean      @default(false)
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+}
+
+model MealHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  recipeId   String?
+  title      String
+  mealType   MealType @default(DINNER)
+  consumedAt DateTime @default(now())
+  calories   Int?
+  protein    Int?
+  carbs      Int?
+  fat        Int?
+  notes      String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, consumedAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  metadata  Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
