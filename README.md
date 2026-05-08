@@ -175,17 +175,3 @@ npm run dev
 - Some AI features fallback gracefully when provider APIs are unavailable
 - Production deployment manifests are not included yet
 
-## GitHub Upload Checklist
-
-- [ ] Verify `.env` files are not committed
-- [ ] Rotate any exposed API keys before publishing
-- [ ] Confirm app runs with setup steps in this README
-- [ ] Add demo screenshots/video link if available
-- [ ] Push repository
-
-## Suggested Next Improvements
-
-- Refresh token/session revocation flow
-- WebSocket live collaboration
-- Email/push notifications
-- Full Dockerization (frontend + backend) for deployment
