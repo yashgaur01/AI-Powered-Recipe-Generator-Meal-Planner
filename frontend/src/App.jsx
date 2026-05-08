@@ -138,7 +138,6 @@ export default function App() {
   const [ingredientInput, setIngredientInput] = useState("tomato,onion,rice");
   const [diet, setDiet] = useState("balanced");
   const [cuisine, setCuisine] = useState("indian");
-  const [calorieTarget, setCalorieTarget] = useState(600);
   const [imageFile, setImageFile] = useState(null);
 
   const [detectedIngredients, setDetectedIngredients] = useState([]);
@@ -374,7 +373,6 @@ export default function App() {
         ingredients: allIngredients,
         diet,
         cuisine,
-        calorieTarget: Number(calorieTarget),
       }, token);
       const normalized = normalizeRecipeForDisplay(result, diet, cuisine);
       setRecipe(normalized);
@@ -1425,7 +1423,7 @@ export default function App() {
             {activeView === DASHBOARD_VIEWS.discovery ? (
               <>
                 <GlassCard>
-                  <SectionHeader title="Recipe Preferences" subtitle="Tune cuisine, diet, and calories to generate personalized meals" />
+                  <SectionHeader title="Recipe Preferences" subtitle="Tune cuisine and diet to generate personalized meals" />
                   <div className="grid gap-3 md:max-w-xl">
                     <select className="premium-input" value={diet} onChange={(e) => setDiet(e.target.value)}>
                       {["balanced", "high-protein", "vegetarian", "vegan", "keto"].map((dietOption) => (
@@ -1441,13 +1439,6 @@ export default function App() {
                         </option>
                       ))}
                     </select>
-                    <input
-                      className="premium-input"
-                      placeholder="Calorie Target"
-                      type="number"
-                      value={calorieTarget}
-                      onChange={(e) => setCalorieTarget(e.target.value)}
-                    />
                     <button
                       className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:scale-[1.02] disabled:opacity-50"
                       type="button"

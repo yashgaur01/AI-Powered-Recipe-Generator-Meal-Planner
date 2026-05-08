@@ -24,6 +24,110 @@ function enrichIngredientsForDiet({ ingredients, diet, cuisine }) {
   return uniqueIngredients(current);
 }
 
+function applyCuisineSignatureIngredients({ ingredients, cuisine, diet }) {
+  const current = uniqueIngredients(ingredients);
+  const cuisineKey = String(cuisine || "").toLowerCase();
+  const dietKey = String(diet || "").toLowerCase();
+  const isPlantForward = /(vegetarian|vegan)/i.test(dietKey);
+
+  const signatureByCuisine = {
+    indian: ["garam masala", "turmeric", "ginger"],
+    mexican: ["black beans", "corn", "lime"],
+    italian: ["basil", "oregano", "olive oil"],
+    mediterranean: ["olive oil", "lemon", "cucumber"],
+    asian: ["soy sauce", "sesame oil", "spring onion"],
+  };
+
+  const cuisineProteinByCuisine = {
+    indian: isPlantForward ? ["paneer", "moong dal"] : ["chicken breast", "lentils"],
+    mexican: isPlantForward ? ["black beans", "tofu"] : ["chicken breast", "black beans"],
+    italian: isPlantForward ? ["cannellini beans", "tofu"] : ["chicken breast", "cannellini beans"],
+    mediterranean: isPlantForward ? ["chickpeas", "feta"] : ["chicken breast", "chickpeas"],
+    asian: isPlantForward ? ["tofu", "edamame"] : ["chicken breast", "edamame"],
+  };
+
+  const signatures =
+    signatureByCuisine[cuisineKey] ||
+    (cuisineKey.includes("indian")
+      ? signatureByCuisine.indian
+      : cuisineKey.includes("mexican")
+      ? signatureByCuisine.mexican
+      : cuisineKey.includes("italian")
+      ? signatureByCuisine.italian
+      : cuisineKey.includes("mediterranean")
+      ? signatureByCuisine.mediterranean
+      : cuisineKey.includes("asian")
+      ? signatureByCuisine.asian
+      : []);
+
+  const proteinAnchors =
+    cuisineProteinByCuisine[cuisineKey] ||
+    (cuisineKey.includes("indian")
+      ? cuisineProteinByCuisine.indian
+      : cuisineKey.includes("mexican")
+      ? cuisineProteinByCuisine.mexican
+      : cuisineKey.includes("italian")
+      ? cuisineProteinByCuisine.italian
+      : cuisineKey.includes("mediterranean")
+      ? cuisineProteinByCuisine.mediterranean
+      : cuisineKey.includes("asian")
+      ? cuisineProteinByCuisine.asian
+      : []);
+
+  current.push(...signatures);
+
+  if (dietKey.includes("high-protein")) {
+    current.push(...proteinAnchors);
+  }
+
+  return uniqueIngredients(current);
+}
+
+function applyCalorieTargetToIngredients({ ingredients, calorieTarget, diet, cuisine }) {
+  const current = uniqueIngredients(ingredients);
+  const target = Number.isFinite(Number(calorieTarget)) ? Number(calorieTarget) : 600;
+  const dietKey = String(diet || "").toLowerCase();
+  const cuisineKey = String(cuisine || "").toLowerCase();
+
+  const isPlantForward = /(vegetarian|vegan|plant)/i.test(dietKey);
+  const isIndian = cuisineKey.includes("indian");
+  const isKeto = cuisineKey.includes("keto") || dietKey.includes("keto");
+
+  const carbKeywords = /(rice|bread|pasta|noodle|potato|quinoa|oats)/i;
+
+  if (target <= 500) {
+    // Make low-calorie recipes visibly lighter instead of returning the same list.
+    const light = current.filter((item) => !carbKeywords.test(item));
+    if (!light.length) {
+      light.push("cauliflower rice");
+    } else if (!light.some((item) => /cauliflower/i.test(item))) {
+      light.push("cauliflower rice");
+    }
+    if (!light.some((item) => /leafy greens|spinach|lettuce|cucumber/i.test(item))) {
+      light.push("leafy greens");
+    }
+    return uniqueIngredients(light);
+  }
+
+  if (target >= 850) {
+    if (isKeto) {
+      current.push("avocado", "olive oil");
+    } else if (isPlantForward) {
+      current.push(isIndian ? "paneer" : "tofu", "quinoa", "olive oil");
+    } else {
+      current.push(isIndian ? "paneer" : "chicken breast", "quinoa", "olive oil");
+    }
+    return uniqueIngredients(current);
+  }
+
+  // Medium band still gets a small shift so nearby targets are not identical.
+  if (!current.some((item) => /protein/i.test(item)) && target >= 650) {
+    current.push(isPlantForward ? "chickpeas" : "chicken breast");
+  }
+
+  return uniqueIngredients(current);
+}
+
 async function generateRecipeWithOpenAI({ ingredients, diet, cuisine, calorieTarget }) {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -100,8 +204,19 @@ export async function generateRecipe(input) {
   const recipeIngredients = ingredients.length
     ? ingredients
     : ["chickpeas", "spinach", "rice"];
-  const enrichedIngredients = enrichIngredientsForDiet({
+  const dietAwareIngredients = enrichIngredientsForDiet({
     ingredients: recipeIngredients,
+    diet,
+    cuisine,
+  });
+  const cuisineAwareIngredients = applyCuisineSignatureIngredients({
+    ingredients: dietAwareIngredients,
+    cuisine,
+    diet,
+  });
+  const targetAwareIngredients = applyCalorieTargetToIngredients({
+    ingredients: cuisineAwareIngredients,
+    calorieTarget,
     diet,
     cuisine,
   });
@@ -109,7 +224,7 @@ export async function generateRecipe(input) {
   let generated = {
     title: `${diet} ${cuisine} Bowl`,
     servings: 2,
-    ingredients: enrichedIngredients,
+    ingredients: targetAwareIngredients,
     steps: [
       "Prep all ingredients and wash vegetables.",
       "Cook base grains and saute vegetables with spices.",
@@ -123,7 +238,7 @@ export async function generateRecipe(input) {
   if (process.env.OPENAI_API_KEY) {
     try {
       generated = await generateRecipeWithOpenAI({
-        ingredients: enrichedIngredients,
+        ingredients: targetAwareIngredients,
         diet,
         cuisine,
         calorieTarget,
@@ -137,7 +252,7 @@ export async function generateRecipe(input) {
   if (!llmSucceeded && process.env.ANTHROPIC_API_KEY) {
     try {
       generated = await generateRecipeWithClaude({
-        ingredients: enrichedIngredients,
+        ingredients: targetAwareIngredients,
         diet,
         cuisine,
         calorieTarget,
@@ -148,8 +263,17 @@ export async function generateRecipe(input) {
     }
   }
 
-  const finalIngredients = enrichIngredientsForDiet({
-    ingredients: generated.ingredients || enrichedIngredients,
+  const finalIngredients = applyCalorieTargetToIngredients({
+    ingredients: applyCuisineSignatureIngredients({
+      ingredients: enrichIngredientsForDiet({
+        ingredients: generated.ingredients || targetAwareIngredients,
+        diet,
+        cuisine,
+      }),
+      cuisine,
+      diet,
+    }),
+    calorieTarget,
     diet,
     cuisine,
   });
